@@ -7,7 +7,7 @@ async function main() {
   console.log("Deploying contracts with the account:", deployer.address);
 
   const Token = await ethers.getContractFactory("Token");
-  const token = await Token.deploy(process.env.WITHDRAW_PASSWORD);
+  const token = await Token.deploy();
 
   const Vault = await ethers.getContractFactory("Vault");
   const vault = await Vault.deploy(token.address);

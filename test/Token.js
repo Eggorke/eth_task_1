@@ -8,13 +8,18 @@ describe("Token contract", function () {
   let owner;
   let alice;
   let bob;
+  let Vault;
+  let hardhatVault;
 
   beforeEach(async function () {
     // Get the ContractFactory and Signers here.
     Token = await ethers.getContractFactory("Token");
     [owner, alice, bob] = await ethers.getSigners();
 
-    hardhatToken = await Token.deploy(process.env.WITHDRAW_PASSWORD);
+    hardhatToken = await Token.deploy();
+
+    Vault = await ethers.getContractFactory("Vault");
+    hardhatVault = await Vault.deploy(hardhatToken.address);
   });
 
   it("Deployment should assign the total supply of tokens to the owner", async function () {
@@ -58,7 +63,7 @@ describe("Token contract", function () {
   });
 
   it("Should transfer token to another address without fee", async function () {
-    await hardhatToken.makeTransfer(alice.address, 500);
+    await hardhatToken.transfer(alice.address, 500);
     const aliceBalance = await hardhatToken.balanceOf(alice.address)
     const ownerBalance = await hardhatToken.balanceOf(owner.address)
     expect(aliceBalance).to.equal(500);
@@ -67,21 +72,28 @@ describe("Token contract", function () {
 
   // finish it
   it("Should transfer token to another address with fee", async function () {
-    Vault = await ethers.getContractFactory("Vault");
-    hardhatVault = await Vault.deploy(hardhatToken.address);
-
     await hardhatToken.setVaultAddress(hardhatVault.address)
-    await hardhatToken.makeTransfer(alice.address, 500);
-    await hardhatToken.connect(alice).makeTransfer(bob.address, 500);
+    await hardhatToken.transfer(alice.address, 500);
+    await hardhatToken.connect(alice).transfer(bob.address, 500);
+    const ownerBalance1 = await hardhatToken.balanceOf(owner.address)
     const aliceBalance = await hardhatToken.balanceOf(alice.address)
     const bobBalance = await hardhatToken.balanceOf(bob.address)
-    await hardhatVault.vaultWithdraw(process.env.WITHDRAW_PASSWORD)
-    const ownerBalance = await hardhatToken.balanceOf(owner.address)
+
+    const vaultBalance = await hardhatToken.balanceOf(hardhatVault.address)
+
     //expect(aliceBalance).to.equal(500);
     //expect(ownerBalance).to.equal(500);
+    console.log(ownerBalance1)
     console.log(aliceBalance)
     console.log(bobBalance)
+    console.log(vaultBalance)
+    console.log('wait')
+
+    await hardhatVault.withdraw()
+    const ownerBalance = await hardhatToken.balanceOf(owner.address)
+    const vaultBalance1 = await hardhatToken.balanceOf(hardhatVault.address)
     console.log(ownerBalance)
+    console.log(vaultBalance1)
   });
 
 });
