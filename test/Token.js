@@ -110,12 +110,53 @@ describe("Token contract", function () {
       .to
       .revertedWith("VM Exception while processing transaction: reverted with reason string 'ERC20: transfer amount exceeds allowance'");
     await hardhatToken.connect(alice).approve(bob.address, 200);
-    //await approve.wait()
-    //await hardhatToken.connect(alice).transferFrom(alice.address, bob.address, 1);
-    console.log(await hardhatToken.allowance(alice.address, bob.address));
+    await hardhatToken.connect(bob).transferFrom(alice.address, bob.address, 100);
+    const bobBalance = await hardhatToken.balanceOf(bob.address);
+    expect(bobBalance).to.equal(95);
   });
 
+  it("Should allow user to call transferFrom without fee", async function () {
+    await hardhatToken.transfer(alice.address, 500);
+    await hardhatToken.addToWhiteList(alice.address);
+    await hardhatToken.connect(alice).approve(bob.address, 200);
+    await hardhatToken.connect(bob).transferFrom(alice.address, bob.address, 100);
+    const bobBalance = await hardhatToken.balanceOf(bob.address);
+    expect(bobBalance).to.equal(100);
+  });
 
+  it("Should dissalow user to call transfer from if sender is in blacklist", async function () {
+    await hardhatToken.transfer(alice.address, 500);
+    await hardhatToken.addToBlackList(alice.address);
+    await hardhatToken.connect(alice).approve(bob.address, 200);
+    await expect(hardhatToken.connect(bob).transferFrom(alice.address, bob.address, 100))
+      .to
+      .revertedWith("VM Exception while processing transaction: reverted with reason string 'Sender is in the blacklist'");
+  });
 
+  it("Should allow user to call burn", async function () {
 
+    await hardhatToken.transfer(alice.address, 500);
+
+    await hardhatToken.connect(alice).burn(300);
+    const aliceBalance = await hardhatToken.balanceOf(alice.address);
+    expect(aliceBalance).to.equal(200);
+
+    // try to burn exceed amount of tokens
+    await expect(hardhatToken.connect(alice).burn(300))
+      .to
+      .revertedWith("VM Exception while processing transaction: reverted with reason string 'ERC20: burn amount exceeds balance'");
+  });
+
+  it("Should allow user to call burnFrom", async function () {
+    await hardhatToken.transfer(alice.address, 500);
+    await expect(hardhatToken.connect(bob).burnFrom(alice.address, 500))
+      .to
+      .revertedWith("VM Exception while processing transaction: reverted with reason string 'ERC20: burn amount exceeds allowance'");
+    await hardhatToken.connect(alice).approve(bob.address, 400);
+    await hardhatToken.connect(bob).burnFrom(alice.address, 200);
+    const allowance = await hardhatToken.allowance(alice.address, bob.address);
+    expect(allowance).to.equal(200);
+    const aliceBalance = await hardhatToken.balanceOf(alice.address);
+    expect(aliceBalance).to.equal(300)
+  });
 });
