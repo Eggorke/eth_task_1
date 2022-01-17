@@ -20,6 +20,7 @@ describe("Token contract", function () {
 
     Vault = await ethers.getContractFactory("Vault");
     hardhatVault = await Vault.deploy(hardhatToken.address);
+    await hardhatToken.setVaultAddress(hardhatVault.address)
   });
 
   it("Deployment should assign the total supply of tokens to the owner", async function () {
@@ -70,30 +71,51 @@ describe("Token contract", function () {
     expect(ownerBalance).to.equal(500);
   });
 
-  // finish it
   it("Should transfer token to another address with fee", async function () {
-    await hardhatToken.setVaultAddress(hardhatVault.address)
     await hardhatToken.transfer(alice.address, 500);
     await hardhatToken.connect(alice).transfer(bob.address, 500);
-    const ownerBalance1 = await hardhatToken.balanceOf(owner.address)
-    const aliceBalance = await hardhatToken.balanceOf(alice.address)
-    const bobBalance = await hardhatToken.balanceOf(bob.address)
 
-    const vaultBalance = await hardhatToken.balanceOf(hardhatVault.address)
+    const ownerBalance = await hardhatToken.balanceOf(owner.address);
+    const aliceBalance = await hardhatToken.balanceOf(alice.address);
+    const bobBalance = await hardhatToken.balanceOf(bob.address);
+    const vaultBalance = await hardhatToken.balanceOf(hardhatVault.address);
 
-    //expect(aliceBalance).to.equal(500);
-    //expect(ownerBalance).to.equal(500);
-    console.log(ownerBalance1)
-    console.log(aliceBalance)
-    console.log(bobBalance)
-    console.log(vaultBalance)
-    console.log('wait')
-
-    await hardhatVault.withdraw()
-    const ownerBalance = await hardhatToken.balanceOf(owner.address)
-    const vaultBalance1 = await hardhatToken.balanceOf(hardhatVault.address)
-    console.log(ownerBalance)
-    console.log(vaultBalance1)
+    expect(aliceBalance).to.equal(0);
+    expect(ownerBalance).to.equal(500);
+    expect(bobBalance).to.equal(475);
+    expect(vaultBalance).to.equal(25);
   });
+
+  it("Should dissalow user from blacklist to make transfer", async function () {
+    await hardhatToken.addToBlackList(alice.address);
+    await hardhatToken.transfer(alice.address, 200);
+    await expect(hardhatToken.connect(alice).transfer(bob.address, 100))
+      .to
+      .revertedWith("VM Exception while processing transaction: reverted with reason string 'Sender is in the blacklist'")
+  });
+
+  it("Should allow owner to make withdraw", async function () {
+    await hardhatToken.transfer(alice.address, 500);
+    await hardhatToken.connect(alice).transfer(bob.address, 500);
+    const ownerBalanceBeforeWithdraw = await hardhatToken.balanceOf(owner.address);
+    expect(ownerBalanceBeforeWithdraw).to.equal(500);
+    await hardhatVault.withdraw();
+    const ownerBalanceAfterWithdraw = await hardhatToken.balanceOf(owner.address);
+    expect(ownerBalanceAfterWithdraw).to.equal(525);
+  });
+
+  it("Should allow user to call transferFrom with fee", async function () {
+    await hardhatToken.transfer(alice.address, 500);
+    await expect(hardhatToken.transferFrom(alice.address, bob.address, 100))
+      .to
+      .revertedWith("VM Exception while processing transaction: reverted with reason string 'ERC20: transfer amount exceeds allowance'");
+    await hardhatToken.connect(alice).approve(bob.address, 200);
+    //await approve.wait()
+    //await hardhatToken.connect(alice).transferFrom(alice.address, bob.address, 1);
+    console.log(await hardhatToken.allowance(alice.address, bob.address));
+  });
+
+
+
 
 });

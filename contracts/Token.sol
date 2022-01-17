@@ -8,6 +8,7 @@ contract Token is Ownable, ERC20, ERC20Burnable {
 
   mapping(address => bool) public whitelist;
   mapping(address => bool) public blacklist;
+
   address private minter;
   address private vaultAddress;
   uint256 private percentFee = 5;
@@ -17,12 +18,12 @@ contract Token is Ownable, ERC20, ERC20Burnable {
     addToWhiteList(msg.sender);
   }
 
-  event MintEvent(address _from, uint256 amount);
-  event TrasferFeeEvent(address _from, uint256 amount);
-  event AddToWhiteListEvent(address _addr);
-  event AddToBlackListEvent(address _addr);
-  event RemoveFromWhiteListEvent(address _addr);
-  event RemoveFromBlackListEvent(address _addr);
+  event Mint(address _from, uint256 amount);
+  event TransferFee(address _from, uint256 amount);
+  event AddToWhiteList(address _addr);
+  event AddToBlackList(address _addr);
+  event RemoveFromWhiteList(address _addr);
+  event RemoveFromBlackList(address _addr);
 
   function setVaultAddress(address _addr) public onlyOwner {
     vaultAddress = _addr;
@@ -41,65 +42,25 @@ contract Token is Ownable, ERC20, ERC20Burnable {
   function mint(uint256 _amount) public {
     require(msg.sender == minter, "You have no access for this action");
     _mint(msg.sender, _amount);
-    emit MintEvent(msg.sender, _amount);
+    emit Mint(msg.sender, _amount);
   }
-
-  function transfer(address _to, uint256 _amount) override public returns(bool) {
-    require(!blacklist[msg.sender], "Sender is in the blacklist");
-    if (whitelist[msg.sender]) {
-      _transfer(msg.sender, _to, _amount);
-    } else {
-      uint256 fee = countFee(_amount);
-      _transfer(msg.sender, _to, (_amount - fee));
-      _transferFee(msg.sender, fee);
-    }
-    return true;
-  }
-
-  function _transferFee(address _from, uint256 _fee) private {
-    _transfer(_from, vaultAddress, _fee);
-    emit TrasferFeeEvent(_from, _fee);
-  }
-
-  function countFee(uint256 _amount) private view returns(uint256) {
-    uint256 fee = _amount * percentFee / 100;
-    return fee;
-  }
-
-
-  // Did this function to collect fees if _from account is not in da blacklist.
-  // But don't know what to do with inherited transferFrom() method, it is still open, and potentially it could be called without paying fee.
-  function makeTransferFrom(address _from, address _to, uint256 _amount) public {
-    require(!blacklist[_from], "Sender is in the blacklist");
-    if (whitelist[_from]) {
-      transferFrom(_from, _to, _amount);
-    } else {
-      uint256 fee = countFee(_amount);
-      bool success = transferFrom(_from, _to, (_amount - fee));
-      if (success) {
-        _transferFee(_from, fee);
-      }
-    }
-  }
-
 
   function addToWhiteList(address _addr) public onlyOwner {
     if (blacklist[_addr]) {
       removeFromBlackList(_addr);
     }
     whitelist[_addr] = true;
-    emit AddToWhiteListEvent(_addr);
+    emit AddToWhiteList(_addr);
   }
 
   function removeFromWhiteList(address _addr) public onlyOwner {
     delete whitelist[_addr];
-    // Looks like event will call even if we try to remove user which is not in white list. Maybe it needs to add require or index to Event.
-    emit RemoveFromWhiteListEvent(_addr);
+    emit RemoveFromWhiteList(_addr);
   }
 
   function removeFromBlackList(address _addr) public onlyOwner {
     delete blacklist[_addr];
-    emit RemoveFromBlackListEvent(_addr);
+    emit RemoveFromBlackList(_addr);
   }
 
   function addToBlackList(address _addr) public onlyOwner {
@@ -107,6 +68,27 @@ contract Token is Ownable, ERC20, ERC20Burnable {
       removeFromWhiteList(_addr);
     }
     blacklist[_addr] = true;
-    emit AddToBlackListEvent(_addr);
+    emit AddToBlackList(_addr);
+  }
+
+  function _transfer(
+        address sender,
+        address recipient,
+        uint256 amount
+  ) internal override {
+    require(!blacklist[sender], "Sender is in the blacklist");
+    if (whitelist[sender]) {
+      super._transfer(sender, recipient, amount);
+    } else {
+      uint256 fee = countFee(amount);
+      super._transfer(sender, recipient, (amount - fee));
+      super._transfer(sender, vaultAddress, fee);
+      emit TransferFee(sender, fee);
+    }
+  }
+
+  function countFee(uint256 _amount) private view returns(uint256) {
+    uint256 fee = _amount * percentFee / 100;
+    return fee;
   }
 }
